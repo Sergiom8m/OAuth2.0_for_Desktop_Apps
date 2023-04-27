@@ -34,15 +34,15 @@ print("\nObtaining OAuth 2.0 access tokens")
 print("\tStep 2: Send a request to Google's OAuth 2.0 server")
 # https://developers.google.com/identity/protocols/oauth2/native-app#step-2:-send-a-request-to-googles-oauth-2.0-server
 base_uri = "https://accounts.google.com/o/oauth2/v2/auth"
-goiburuak = {'Host': 'accounts.google.com'}
-datuak = {'client_id': client_id,
+
+data = {'client_id': client_id,
           'redirect_uri': 'http://127.0.0.1:8090', # Loopback IP address
           'response_type': 'code',
           'scope': scope}
-datuak_kodifikatuta = urllib.parse.urlencode(datuak)
-step2_uri = base_uri + '?' + datuak_kodifikatuta
+coded_data = urllib.parse.urlencode(data)
+step2_uri = base_uri + '?' + coded_data
 print("\t" + step2_uri)
-webbrowser.open_new(step2_uri) # eskaera nabigatzailean zabaldu (GET metodoa modu lehenetsian erabiliko da)
+webbrowser.open_new(step2_uri) # Open the request on the explorer (GET is the predetermined method)
 print("\n\tStep 3: Google prompts user for consent")
 
 
@@ -55,21 +55,21 @@ server_socket.listen(1)
 print("\t\tSocket listening on port 8090")
 
 print("\t\tWaiting for client requests...")
-# ondorengo lerroan programa gelditzen da zerbitzariak 302 eskaera jasotzen duen arte
+# In the following line the program stops until the server receives 302 requests.
 client_connection, client_address = server_socket.accept()
 
-# nabitzailetik 302 eskaera jaso
-eskaera = client_connection.recv(1024).decode()
-print("\t\tNabigatzailetik ondorengo eskaera jaso da:")
-print("\n" + eskaera)
+# Recieve 302 response from the explorer
+request = client_connection.recv(1024).decode()
+print("\t\tThe next request has been received from the explorer:")
+print("\n" + request)
 
-# eskaeran "auth_code"-a bilatu
-lehenengo_lerroa = eskaera.split('\n')[0]
-aux_auth_code = lehenengo_lerroa.split(' ')[1]
+# Search for the auth_code on the request
+first_line = request.split('\n')[0]
+aux_auth_code = first_line.split(' ')[1]
 auth_code = aux_auth_code[7:].split('&')[0]
 print("auth_code: " + auth_code)
 
-# erabiltzaileari erantzun bat bueltatu
+# Send a response to the user
 http_response = """\
 HTTP/1.1 200 OK
 
@@ -87,65 +87,61 @@ server_socket.close()
 
 print("\n\tStep 5: Exchange authorization code for refresh and access tokens")
 # https://developers.google.com/identity/protocols/oauth2/native-app#exchange-authorization-code
-uria = "https://oauth2.googleapis.com/token"
-goiburuak = {'Host': 'oauth2.googleapis.com',
-             'Content-Type': 'application/x-www-form-urlencoded'}
-datuak = {'client_id': client_id,
-          'client_secret': client_secret,
-          'code': auth_code,
-          'grant_type': 'authorization_code',
-          'redirect_uri': 'http://127.0.0.1:8090'}
-datuak_kodifikatuta = urllib.parse.urlencode(datuak)
-goiburuak['Content-Length'] = str(len(datuak_kodifikatuta))
-erantzuna = requests.post(uria, headers=goiburuak, data=datuak_kodifikatuta, allow_redirects=False)
-status = erantzuna.status_code
+uri = "https://oauth2.googleapis.com/token"
+headers = {'Host': 'oauth2.googleapis.com',
+            'Content-Type': 'application/x-www-form-urlencoded'}
+data = {'client_id': client_id,
+            'client_secret': client_secret,
+            'code': auth_code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': 'http://127.0.0.1:8090'}
+coded_data = urllib.parse.urlencode(data)
+headers['Content-Length'] = str(len(coded_data))
+response = requests.post(uri, headers=headers, data=coded_data, allow_redirects=False)
+status = response.status_code
 print("\t\tStatus: " + str(status))
 
 # Google responds to this request by returning a JSON object
 # that contains a short-lived access token and a refresh token.
-edukia = erantzuna.text
-print("\t\tEdukia:")
-print("\n" + edukia)
-edukia_json = json.loads(edukia)
-access_token = edukia_json['access_token']
+content = response.text
+print("\t\tContent:")
+print("\n" + content)
+content_json = json.loads(content)
+access_token = content_json['access_token']
 print("\naccess_token: " + access_token)
 
 
 input("\nThe authentication flow has completed. Close browser window and press enter to continue...")
 
-
-#print("\nCalling Google APIs")
-
-
 print("\nCalling Google APIs")
 # https://developers.google.com/identity/protocols/oauth2/native-app#callinganapi
 # Drive API --> Files --> list --> https://developers.google.com/drive/api/v3/reference/files/list
 uri = 'https://www.googleapis.com/drive/v3/files'
-goiburuak = {'Host': 'www.googleapis.com',
+headers = {'Host': 'www.googleapis.com',
              'Authorization': 'Bearer ' + access_token }
-erantzuna = requests.get(uri, headers=goiburuak, allow_redirects=False)
-status = erantzuna.status_code
+response = requests.get(uri, headers=headers, allow_redirects=False)
+status = response.status_code
 print("\tStatus: " + str(status))
-edukia = erantzuna.text
+content = response.text
 print("\tEdukia:")
-print(edukia)
+print(content)
 input("Press enter to process JSON data structure...")
-edukia_json = json.loads(edukia)
-for each in edukia_json['files']:
+content_json = json.loads(content)
+for each in content_json['files']:
     print(each['name'])
 
-# zerrenda orrikatuta badago, hurrengo orrialdeko emaitzak lortu
-if 'nextPageToken' in edukia_json:
-    datuak = {'pageToken': edukia_json['nextPageToken'], }
-    datuak_kodifikatuta = urllib.parse.urlencode(datuak)
-    erantzuna = requests.get(uri + '?' + datuak_kodifikatuta,
-                             headers=goiburuak, allow_redirects=False)
-    status = erantzuna.status_code
+# If the list has some pages, get the data from the next pages
+if 'nextPageToken' in content_json:
+    data = {'pageToken': content_json['nextPageToken'], }
+    coded_data = urllib.parse.urlencode(data)
+    response = requests.get(uri + '?' + coded_data,
+                             headers=headers, allow_redirects=False)
+    status = response.status_code
     print("\tStatus: " + str(status))
-    edukia = erantzuna.text
+    content = response.text
     print("\tEdukia:")
-    print(edukia)
+    print(content)
     input("Press enter to process JSON data structure...")
-    edukia_json = json.loads(edukia)
-    for each in edukia_json['files']:
+    content_json = json.loads(content)
+    for each in content_json['files']:
         print(each['name'])
