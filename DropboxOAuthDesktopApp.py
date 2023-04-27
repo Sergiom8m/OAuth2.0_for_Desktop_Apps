@@ -4,7 +4,6 @@ import webbrowser
 import socket
 import json
 
-
 app_key = "ascjwcamtdbviac"
 app_secret = "gwwma53ln9iar0x"
 server_addr = "localhost"
@@ -13,28 +12,26 @@ redirect_uri = "http://" + server_addr + ":" + str(server_port)
 
 
 def local_server():
-
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind(('localhost', 8090))
     server_socket.listen(1)
     print('\t\tSocker listening on port 8090')
 
     print('\t\tWaiting for client request')
-    # Programa gelditzen da zerbitzariak 302 erantzuna jaso arte
+    # In the following line the program stops until the server receives 302 requests.
     client_connection, client_adress = server_socket.accept()
 
-    # Nabigatzailetik 302 eskaera jaso
-    eskaera = client_connection.recv(1024).decode()
-    print('\n' + eskaera)
+    # Receive 302 response from the explorer
+    request = client_connection.recv(1024).decode()
+    print('\n' + request)
 
-
-    # eskaeran "auth_code"-a bilatu
-    lehenengo_lerroa = eskaera.split('\n')[0]
-    aux_auth_code = lehenengo_lerroa.split(' ')[1]
+    # Search for the auth_code on the request
+    first_line = request.split('\n')[0]
+    aux_auth_code = first_line.split(' ')[1]
     auth_code = aux_auth_code[7:].split('&')[0]
-    print("auth_code: " + auth_code)
+    print("Auth_code: " + auth_code)
 
-    # erabiltzaileari erantzun bat bueltatu
+    # Send a response to the user
     http_response = """\
     HTTP/1.1 200 OK
 
@@ -51,79 +48,75 @@ def local_server():
     server_socket.close()
 
     return auth_code
-def do_oauth():
-    # Authorization
 
+
+def do_oauth():
+
+    # Authorization
     uri = "https://www.dropbox.com/oauth2/authorize"
-    datuak = {'client_id': app_key,
+    data = {'client_id': app_key,
               'redirect_uri': redirect_uri,  # LoopBack IP address
               'response_type': 'code'}
 
-    datuak_kodifikatuta = urllib.parse.urlencode(datuak)
-
-    step2_uri = uri + '?' + datuak_kodifikatuta
-    webbrowser.open_new(step2_uri)  # eskaera nabigatzailean zabaldu (GET metodoa erabiliko da, parametroak ?-ren ostean)
-
+    coded_data = urllib.parse.urlencode(data)
+    uri = uri + '?' + coded_data
+    webbrowser.open_new(uri)  # Open the request on the explorer (GET is the predetermined method)
     auth_code = local_server()
 
-
     # Exchange authorization code for access token
-
     uri = "https://api.dropboxapi.com/oauth2/token"
-
-    goiburuak = {'Host': 'api.dropboxapi.com',
-                'Content-Type': 'application/x-www-form-urlencoded'}
-
-    datuak = {'code': auth_code,
+    headers = {'Host': 'api.dropboxapi.com',
+                 'Content-Type': 'application/x-www-form-urlencoded'}
+    data = {'code': auth_code,
               'client_id': app_key,
               'client_secret': app_secret,
               'redirect_uri': redirect_uri,  # LoopBack IP address
               'grant_type': 'authorization_code'}
 
-    erantzuna = requests.post(uri,headers=goiburuak, data=datuak, allow_redirects=False)
+    response = requests.post(uri, headers=headers, data=data, allow_redirects=False)
 
-    status_code = erantzuna.status_code
-    edukia = erantzuna.text
-    edukia_json = json.loads(edukia)
-    access_token = edukia_json['access_token']
+    status_code = response.status_code
+    content = response.text
+    content_json = json.loads(content)
+    access_token = content_json['access_token']
     print('Status:' + str(status_code))
-    print('Edukia:' + edukia)
+    print('Content:' + content)
     print('Access token:' + access_token)
 
     return access_token
 
 
-def list_folder(access_token, cursor="", edukia_json_entries=[]):
+def list_folder(access_token, cursor="", content_json_entries=[]):
     if not cursor:
         print("/list_folder")
         uri = "https://api.dropboxapi.com/2/files/list_folder"
-        datuak = {'path': ''}
+        data = {'path': ''}
     else:
         print("/list_folder/continue")
         uri = "https://api.dropboxapi.com/2/files/list_folder/continue"
-        datuak = {'cursor': cursor}
+        data = {'cursor': cursor}
 
     # Call Dropbox API
-    goiburuak = {'Content-Type': 'application/json',
+    headers = {'Content-Type': 'application/json',
                  'Authorization': 'Bearer ' + access_token}
 
-    datuak_json = json.dumps(datuak)
-    erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
+    data_json = json.dumps(data)
+    response = requests.post(uri, headers=headers, data=data_json, allow_redirects=False)
 
-    status_code = erantzuna.status_code
-    edukia = erantzuna.text
+    status_code = response.status_code
+    content = response.text
     print('Status:' + str(status_code))
-    print('Edukia:' + edukia)
+    print('Content:' + content)
 
     # See if there are more entries available. Process data.
-    edukia_json = json.loads(edukia)
+    content_json = json.loads(content)
 
-    for n in edukia_json['entries']:
-        izena = n['name']
-        print('\n' + izena)
+    for n in content_json['entries']:
+        name = n['name']
+        print('\n' + name)
 
-    if edukia_json['has_more']:
-        list_folder(access_token, edukia_json['cursor'])
+    if content_json['has_more']:
+        list_folder(access_token, content_json['cursor'])
 
 
 access_token = do_oauth()
