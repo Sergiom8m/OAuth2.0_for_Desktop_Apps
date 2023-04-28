@@ -15,15 +15,15 @@ def local_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind(('localhost', 8090))
     server_socket.listen(1)
-    print('\t\tSocker listening on port 8090')
+    print('Socket listening on port 8090')
 
-    print('\t\tWaiting for client request')
+    print('Waiting for client request')
     # In the following line the program stops until the server receives 302 requests.
     client_connection, client_adress = server_socket.accept()
 
     # Receive 302 response from the explorer
     request = client_connection.recv(1024).decode()
-    print('\n' + request)
+    # print('\n' + request)
 
     # Search for the auth_code on the request
     first_line = request.split('\n')[0]
@@ -51,12 +51,11 @@ def local_server():
 
 
 def do_oauth():
-
     # Authorization
     uri = "https://www.dropbox.com/oauth2/authorize"
     data = {'client_id': app_key,
-              'redirect_uri': redirect_uri,  # LoopBack IP address
-              'response_type': 'code'}
+            'redirect_uri': redirect_uri,  # LoopBack IP address
+            'response_type': 'code'}
 
     coded_data = urllib.parse.urlencode(data)
     uri = uri + '?' + coded_data
@@ -66,12 +65,12 @@ def do_oauth():
     # Exchange authorization code for access token
     uri = "https://api.dropboxapi.com/oauth2/token"
     headers = {'Host': 'api.dropboxapi.com',
-                 'Content-Type': 'application/x-www-form-urlencoded'}
+               'Content-Type': 'application/x-www-form-urlencoded'}
     data = {'code': auth_code,
-              'client_id': app_key,
-              'client_secret': app_secret,
-              'redirect_uri': redirect_uri,  # LoopBack IP address
-              'grant_type': 'authorization_code'}
+            'client_id': app_key,
+            'client_secret': app_secret,
+            'redirect_uri': redirect_uri,  # LoopBack IP address
+            'grant_type': 'authorization_code'}
 
     response = requests.post(uri, headers=headers, data=data, allow_redirects=False)
 
@@ -79,8 +78,8 @@ def do_oauth():
     content = response.text
     content_json = json.loads(content)
     access_token = content_json['access_token']
-    print('Status:' + str(status_code))
-    print('Content:' + content)
+    # print('Status:' + str(status_code))
+    # print('Content:' + content)
     print('Access token:' + access_token)
 
     return access_token
@@ -98,15 +97,15 @@ def list_folder(access_token, cursor="", content_json_entries=[]):
 
     # Call Dropbox API
     headers = {'Content-Type': 'application/json',
-                 'Authorization': 'Bearer ' + access_token}
+                'Authorization': 'Bearer ' + access_token}
 
     data_json = json.dumps(data)
     response = requests.post(uri, headers=headers, data=data_json, allow_redirects=False)
 
     status_code = response.status_code
     content = response.text
-    print('Status:' + str(status_code))
-    print('Content:' + content)
+    # print('Status:' + str(status_code))
+    # print('Content:' + content)
 
     # See if there are more entries available. Process data.
     content_json = json.loads(content)
