@@ -85,11 +85,11 @@ def do_oauth():
     return access_token
 
 
-def list_folder(access_token, cursor="", content_json_entries=[]):
+def list_folder(access_token, cursor=""):
     if not cursor:
         print("/list_folder")
         uri = "https://api.dropboxapi.com/2/files/list_folder"
-        data = {'path': ''}
+        data = {'path': '', 'recursive': True}
     else:
         print("/list_folder/continue")
         uri = "https://api.dropboxapi.com/2/files/list_folder/continue"
@@ -109,7 +109,6 @@ def list_folder(access_token, cursor="", content_json_entries=[]):
 
     # See if there are more entries available. Process data.
     content_json = json.loads(content)
-
     for n in content_json['entries']:
         name = n['name']
         print('\n' + name)
